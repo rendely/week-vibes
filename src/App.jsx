@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import bannerImage from "./assets/banner.png";
+import zeldaMusic from "./assets/zelda.mp3";
 
 const starterBuckets = [
   {
@@ -61,7 +62,20 @@ export default function App() {
     localStorage.setItem('week-vibes-buckets', JSON.stringify(buckets));
   }, [buckets]);
 
+  const [audioInstance, setAudioInstance] = useState(null);
+
+  const playZeldaMusic = () => {
+    if (audioInstance && !audioInstance.paused) {
+      return;
+    }
+    const audio = new Audio(zeldaMusic);
+    audio.volume = 0.5;
+    audio.play();
+    setAudioInstance(audio);
+  };
+
   const incrementEntry = (bucketId, entryId) => {
+    playZeldaMusic();
     setBuckets(prev =>
       prev.map(bucket =>
         bucket.id === bucketId
