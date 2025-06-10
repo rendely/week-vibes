@@ -5,20 +5,29 @@ import bannerImage from "./assets/banner.png";
 const starterBuckets = [
   {
     id: uuidv4(),
-    name: "Chill / Veg",
+    name: "Body Boost",
     entries: [
-      { id: uuidv4(), title: "Read fiction book", count: 0 },
-      { id: uuidv4(), title: "Watch a movie", count: 0 },
-      { id: uuidv4(), title: "Watch TV show", count: 0 }
+      { id: uuidv4(), title: "Go for a walk", count: 0 },
+      { id: uuidv4(), title: "Do some stretches", count: 0 },
+      { id: uuidv4(), title: "Dance to music", count: 0 }
     ]
   },
   {
     id: uuidv4(),
-    name: "Outdoor",
+    name: "Mind Reset",
     entries: [
-      { id: uuidv4(), title: "Walk dogs", count: 0 },
-      { id: uuidv4(), title: "Go for a run", count: 0 },
-      { id: uuidv4(), title: "Beer on balcony", count: 0 }
+      { id: uuidv4(), title: "Take a power nap", count: 0 },
+      { id: uuidv4(), title: "Watch something funny", count: 0 },
+      { id: uuidv4(), title: "Call a friend", count: 0 }
+    ]
+  },
+  {
+    id: uuidv4(),
+    name: "Create & Play",
+    entries: [
+      { id: uuidv4(), title: "Try a new recipe", count: 0 },
+      { id: uuidv4(), title: "Write in a journal", count: 0 },
+      { id: uuidv4(), title: "Learn something new", count: 0 }
     ]
   }
 ];
@@ -30,6 +39,23 @@ export default function App() {
   });
   const [newBucketName, setNewBucketName] = useState("");
   const [entryInputs, setEntryInputs] = useState({});
+  const [editingBucket, setEditingBucket] = useState(null);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [editBucketName, setEditBucketName] = useState("");
+  const [editEntryTitle, setEditEntryTitle] = useState("");
+
+  const totalScore = buckets.reduce((total, bucket) => 
+    total + bucket.entries.reduce((sum, entry) => sum + entry.count, 0), 0
+  );
+
+  const getVibeLevel = (score) => {
+    if (score > 20) return { level: "Very High", color: "text-purple-600", bg: "bg-purple-100" };
+    if (score > 10) return { level: "High", color: "text-green-600", bg: "bg-green-100" };
+    if (score > 5) return { level: "Medium", color: "text-yellow-600", bg: "bg-yellow-100" };
+    return { level: "Low", color: "text-gray-600", bg: "bg-gray-100" };
+  };
+
+  const vibe = getVibeLevel(totalScore);
 
   useEffect(() => {
     localStorage.setItem('week-vibes-buckets', JSON.stringify(buckets));
@@ -100,6 +126,77 @@ export default function App() {
     );
   };
 
+  const clearAllScores = () => {
+    if (window.confirm('Are you sure you want to clear all scores? This will reset all counts to 0 and cannot be undone.')) {
+      setBuckets(prev =>
+        prev.map(bucket => ({
+          ...bucket,
+          entries: bucket.entries.map(entry => ({
+            ...entry,
+            count: 0
+          }))
+        }))
+      );
+    }
+  };
+
+  const startEditingBucket = (bucketId, currentName) => {
+    setEditingBucket(bucketId);
+    setEditBucketName(currentName);
+  };
+
+  const saveEditBucket = (bucketId) => {
+    const name = editBucketName.trim();
+    if (!name) return;
+    
+    setBuckets(prev =>
+      prev.map(bucket =>
+        bucket.id === bucketId
+          ? { ...bucket, name }
+          : bucket
+      )
+    );
+    setEditingBucket(null);
+    setEditBucketName("");
+  };
+
+  const cancelEditBucket = () => {
+    setEditingBucket(null);
+    setEditBucketName("");
+  };
+
+  const startEditingEntry = (entryId, currentTitle) => {
+    setEditingEntry(entryId);
+    setEditEntryTitle(currentTitle);
+  };
+
+  const saveEditEntry = (bucketId, entryId) => {
+    const title = editEntryTitle.trim();
+    if (!title) return;
+    
+    setBuckets(prev =>
+      prev.map(bucket =>
+        bucket.id === bucketId
+          ? {
+              ...bucket,
+              entries: bucket.entries.map(entry =>
+                entry.id === entryId
+                  ? { ...entry, title }
+                  : entry
+              )
+            }
+          : bucket
+      )
+    );
+    setEditingEntry(null);
+    setEditEntryTitle("");
+  };
+
+  const cancelEditEntry = () => {
+    setEditingEntry(null);
+    setEditEntryTitle("");
+  };
+
   return (
     <div className="bg-gradient-to-br from-blue-200 via-teal-100 to-green-100 min-h-screen font-sans">
       <div 
@@ -113,6 +210,26 @@ export default function App() {
         />
       </div>
       <div className="p-6 max-w-4xl mx-auto">
+        <div className={`${vibe.bg} rounded-2xl p-4 mb-6 text-center border border-opacity-30`}>
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-700">Vibe Meter</h2>
+            <div className={`${vibe.color} text-2xl font-bold`}>
+              {vibe.level}
+            </div>
+          </div>
+          <div className="mt-2 flex justify-between items-center">
+            <div className="text-lg text-gray-600">
+              Total Score: <span className="font-semibold">{totalScore}</span>
+            </div>
+            <button
+              type="button"
+              onClick={clearAllScores}
+              className="text-gray-400 hover:text-red-500 text-xs underline"
+            >
+              clear
+            </button>
+          </div>
+        </div>
         <h1 className="text-4xl font-extrabold mb-6 text-teal-600">Vibe Tracker</h1>
 
       {/* New Bucket */}
@@ -141,12 +258,51 @@ export default function App() {
             className="rounded-2xl shadow-lg p-5 border border-blue-200 bg-white/80"
           >
             <div className="flex justify-between items-center mb-2">
-              <h2 className="text-2xl font-bold text-blue-700">
-                {bucket.name}{" "}
-                <span className="text-base font-normal">
-                  ({bucket.entries.reduce((sum, e) => sum + e.count, 0)})
-                </span>
-              </h2>
+              {editingBucket === bucket.id ? (
+                <div className="flex gap-2 items-center flex-1">
+                  <input
+                    className="text-2xl font-bold text-blue-700 bg-transparent border-b-2 border-blue-300 focus:outline-none focus:border-blue-500 flex-1"
+                    type="text"
+                    value={editBucketName}
+                    onChange={e => setEditBucketName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') saveEditBucket(bucket.id);
+                      if (e.key === 'Escape') cancelEditBucket();
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => saveEditBucket(bucket.id)}
+                    className="text-sm text-green-600 hover:underline"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEditBucket}
+                    className="text-sm text-gray-500 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-blue-700">
+                    {bucket.name}{" "}
+                    <span className="text-base font-normal">
+                      ({bucket.entries.reduce((sum, e) => sum + e.count, 0)})
+                    </span>
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => startEditingBucket(bucket.id, bucket.name)}
+                    className="text-sm text-blue-500 hover:underline"
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => removeBucket(bucket.id)}
@@ -163,9 +319,49 @@ export default function App() {
                   key={entry.id}
                   className="flex justify-between items-center bg-blue-50 px-3 py-2 rounded-xl"
                 >
-                  <span>
-                    {entry.title} ({entry.count})
-                  </span>
+                  {editingEntry === entry.id ? (
+                    <div className="flex gap-2 items-center flex-1">
+                      <input
+                        className="bg-transparent border-b border-blue-300 focus:outline-none focus:border-blue-500 flex-1"
+                        type="text"
+                        value={editEntryTitle}
+                        onChange={e => setEditEntryTitle(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') saveEditEntry(bucket.id, entry.id);
+                          if (e.key === 'Escape') cancelEditEntry();
+                        }}
+                        autoFocus
+                      />
+                      <span>({entry.count})</span>
+                      <button
+                        type="button"
+                        onClick={() => saveEditEntry(bucket.id, entry.id)}
+                        className="text-xs text-green-600 hover:underline"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditEntry}
+                        className="text-xs text-gray-500 hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-1">
+                      <span>
+                        {entry.title} ({entry.count})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => startEditingEntry(entry.id, entry.title)}
+                        className="text-xs text-blue-500 hover:underline"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
