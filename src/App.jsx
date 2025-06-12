@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import bannerImage from "./assets/banner.png";
 import zeldaMusic from "./assets/zelda.mp3";
+import { useAuth } from "./hooks/useAuth";
+import { useUserData } from "./hooks/useUserData";
+import AuthForm from "./components/AuthForm";
 
 const starterBuckets = [
   {
@@ -34,16 +37,55 @@ const starterBuckets = [
 ];
 
 export default function App() {
-  const [buckets, setBuckets] = useState(() => {
-    const saved = localStorage.getItem('week-vibes-buckets');
-    return saved ? JSON.parse(saved) : starterBuckets;
-  });
+  const { user, loading: authLoading, signInWithEmail, signUpWithEmail, signOut } = useAuth();
+  const { buckets, loading: dataLoading, error, updateBuckets } = useUserData(user);
+  
   const [newBucketName, setNewBucketName] = useState("");
   const [entryInputs, setEntryInputs] = useState({});
   const [editingBucket, setEditingBucket] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [editBucketName, setEditBucketName] = useState("");
   const [editEntryTitle, setEditEntryTitle] = useState("");
+  const [audioInstance, setAudioInstance] = useState(null);
+
+  // Show auth form if user is not signed in
+  if (!authLoading && !user) {
+    return (
+      <AuthForm 
+        onSignIn={signInWithEmail} 
+        onSignUp={signUpWithEmail} 
+      />
+    );
+  }
+
+  // Show loading spinner while authenticating or loading data
+  if (authLoading || dataLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-green-100 flex items-center justify-center">
+        <div className="text-2xl text-teal-600">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show error if there's a data loading error
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-200 via-teal-100 to-green-100 flex items-center justify-center">
+        <div className="text-red-600 text-center">
+          <p className="text-xl mb-4">Error loading data</p>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  
 
   const totalScore = buckets.reduce((total, bucket) => 
     total + bucket.entries.reduce((sum, entry) => sum + entry.count, 0), 0
@@ -58,12 +100,6 @@ export default function App() {
 
   const vibe = getVibeLevel(totalScore);
 
-  useEffect(() => {
-    localStorage.setItem('week-vibes-buckets', JSON.stringify(buckets));
-  }, [buckets]);
-
-  const [audioInstance, setAudioInstance] = useState(null);
-
   const playZeldaMusic = () => {
     if (audioInstance && !audioInstance.paused) {
       return;
@@ -76,31 +112,32 @@ export default function App() {
 
   const incrementEntry = (bucketId, entryId) => {
     playZeldaMusic();
-    setBuckets(prev =>
-      prev.map(bucket =>
-        bucket.id === bucketId
-          ? {
-              ...bucket,
-              entries: bucket.entries.map(entry =>
-                entry.id === entryId
-                  ? { ...entry, count: entry.count + 1 }
-                  : entry
-              )
-            }
-          : bucket
-      )
+    const newBuckets = buckets.map(bucket =>
+      bucket.id === bucketId
+        ? {
+            ...bucket,
+            entries: bucket.entries.map(entry =>
+              entry.id === entryId
+                ? { ...entry, count: entry.count + 1 }
+                : entry
+            )
+          }
+        : bucket
     );
+    updateBuckets(newBuckets);
   };
 
   const addBucket = () => {
     const name = newBucketName.trim();
     if (!name) return;
-    setBuckets(prev => [...prev, { id: uuidv4(), name, entries: [] }]);
+    const newBuckets = [...buckets, { id: uuidv4(), name, entries: [] }];
+    updateBuckets(newBuckets);
     setNewBucketName("");
   };
 
   const removeBucket = bucketId => {
-    setBuckets(prev => prev.filter(b => b.id !== bucketId));
+    const newBuckets = buckets.filter(b => b.id !== bucketId);
+    updateBuckets(newBuckets);
     setEntryInputs(prev => {
       const copy = { ...prev };
       delete copy[bucketId];
@@ -112,45 +149,42 @@ export default function App() {
     const trimmed = title.trim();
     if (!trimmed) return;
 
-    setBuckets(prev =>
-      prev.map(bucket =>
-        bucket.id === bucketId
-          ? {
-              ...bucket,
-              entries: [
-                ...bucket.entries,
-                { id: uuidv4(), title: trimmed, count: 0 }
-              ]
-            }
-          : bucket
-      )
+    const newBuckets = buckets.map(bucket =>
+      bucket.id === bucketId
+        ? {
+            ...bucket,
+            entries: [
+              ...bucket.entries,
+              { id: uuidv4(), title: trimmed, count: 0 }
+            ]
+          }
+        : bucket
     );
+    updateBuckets(newBuckets);
   };
 
   const removeEntry = (bucketId, entryId) => {
-    setBuckets(prev =>
-      prev.map(bucket =>
-        bucket.id === bucketId
-          ? {
-              ...bucket,
-              entries: bucket.entries.filter(e => e.id !== entryId)
-            }
-          : bucket
-      )
+    const newBuckets = buckets.map(bucket =>
+      bucket.id === bucketId
+        ? {
+            ...bucket,
+            entries: bucket.entries.filter(e => e.id !== entryId)
+          }
+        : bucket
     );
+    updateBuckets(newBuckets);
   };
 
   const clearAllScores = () => {
     if (window.confirm('Are you sure you want to clear all scores? This will reset all counts to 0 and cannot be undone.')) {
-      setBuckets(prev =>
-        prev.map(bucket => ({
-          ...bucket,
-          entries: bucket.entries.map(entry => ({
-            ...entry,
-            count: 0
-          }))
+      const clearedBuckets = buckets.map(bucket => ({
+        ...bucket,
+        entries: bucket.entries.map(entry => ({
+          ...entry,
+          count: 0
         }))
-      );
+      }));
+      updateBuckets(clearedBuckets);
     }
   };
 
@@ -163,13 +197,12 @@ export default function App() {
     const name = editBucketName.trim();
     if (!name) return;
     
-    setBuckets(prev =>
-      prev.map(bucket =>
-        bucket.id === bucketId
-          ? { ...bucket, name }
-          : bucket
-      )
+    const updatedBuckets = buckets.map(bucket =>
+      bucket.id === bucketId
+        ? { ...bucket, name }
+        : bucket
     );
+    updateBuckets(updatedBuckets);
     setEditingBucket(null);
     setEditBucketName("");
   };
@@ -188,20 +221,19 @@ export default function App() {
     const title = editEntryTitle.trim();
     if (!title) return;
     
-    setBuckets(prev =>
-      prev.map(bucket =>
-        bucket.id === bucketId
-          ? {
-              ...bucket,
-              entries: bucket.entries.map(entry =>
-                entry.id === entryId
-                  ? { ...entry, title }
-                  : entry
-              )
-            }
-          : bucket
-      )
+    const updatedBuckets = buckets.map(bucket =>
+      bucket.id === bucketId
+        ? {
+            ...bucket,
+            entries: bucket.entries.map(entry =>
+              entry.id === entryId
+                ? { ...entry, title }
+                : entry
+            )
+          }
+        : bucket
     );
+    updateBuckets(updatedBuckets);
     setEditingEntry(null);
     setEditEntryTitle("");
   };
@@ -227,8 +259,17 @@ export default function App() {
         <div className={`${vibe.bg} rounded-2xl p-4 mb-6 text-center border border-opacity-30`}>
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-700">Vibe Meter</h2>
-            <div className={`${vibe.color} text-2xl font-bold`}>
-              {vibe.level}
+            <div className="flex items-center gap-4">
+              <div className={`${vibe.color} text-2xl font-bold`}>
+                {vibe.level}
+              </div>
+              <button
+                type="button"
+                onClick={signOut}
+                className="text-gray-500 hover:text-red-500 text-sm underline"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
           <div className="mt-2 flex justify-between items-center">
